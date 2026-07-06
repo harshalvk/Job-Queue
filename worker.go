@@ -114,5 +114,11 @@ func backoffDuration(attempt int) time.Duration{
 
 func (wp *WorkerPool) moveToDeadLetter(ctx context.Context, job *Job){
 	job.Status = StatusDeadLetter
-	log.Printf("job %s: exhausted retries, moving to dead-letter (stub)", job.ID)
+
+	if error := wp.queue.MoveToDeadLetter(ctx, job); error != nil {
+		log.Printf("job %s: failed to move to dead letter: %v", job.ID, error)
+		return
+	}
+
+	log.Printf("job %s: moved to dead-letter queue after %d attempts", job.ID, job.Attempts)
 }
