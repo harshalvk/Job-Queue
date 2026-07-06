@@ -23,7 +23,7 @@ type Job struct {
 	Payload     json.RawMessage `json:"payload"`
 	Status      JobStatus       `json:"status"`
 	Attempts    int             `json:"attempts"` 
-	MaxAttempts int             `json:"max_attempts`
+	MaxAttempts int             `json:"max_attempts"`
 	CreatedAt   time.Time       `json:"created_at"`
 	RunAt       time.Time       `json:"run_at"`
 	LastError   string	        `json:"last_error,omitempty"`
