@@ -11,13 +11,15 @@ type Handler func(ctx context.Context, job *Job) error
 
 type WorkerPool struct {
 	queue *Queue
+	store *Store
 	handlers map[string]Handler
 	concurrency int
 }
 
-func NewWorkerPool(queue *Queue, concurrency int) *WorkerPool {
+func NewWorkerPool(queue *Queue, store *Store, concurrency int) *WorkerPool {
 	return &WorkerPool{
 		queue: queue,
+		store: store,
 		handlers: make(map[string]Handler),
 		concurrency: concurrency,
 	}
@@ -68,12 +70,21 @@ func (wp *WorkerPool) process(ctx context.Context, workerID int, job *Job){
 	error := handler(ctx, job)
 
 	if error == nil {
+		job.Status = StatusCompleted
+		if error := wp.store.RecordStatus(ctx, job); error != nil {
+			log.Printf("job %s: failed to recrod completed status: %v", job.ID, error)
+		}
+
 		log.Printf("worker %d: job %s completed", workerID, job.ID)
 		return
 	}
 
 	job.Attempts++
 	job.LastError = error.Error()
+	job.Status = StatusFailed
+	if recError := wp.store.RecordCreated(ctx, job); recError != nil {
+		log.Printf("job %s: failed to record failed status: %v", job.ID, recError)
+	}
 	log.Printf("worker %d: job %s failed: %v", workerID, job.ID, error)
 
 	if job.Attempts >= job.MaxAttempts {
@@ -113,6 +124,9 @@ func (wp *WorkerPool) moveToDeadLetter(ctx context.Context, job *Job){
 	if error := wp.queue.MoveToDeadLetter(ctx, job); error != nil {
 		log.Printf("job %s: failed to move to dead letter: %v", job.ID, error)
 		return
+	}
+	if error := wp.store.RecordStatus(ctx, job); error != nil {
+		log.Printf("job %s: failed to record dead-letter status: %v", job.ID, error)
 	}
 
 	log.Printf("job %s: moved to dead-letter queue after %d attempts", job.ID, job.Attempts)
