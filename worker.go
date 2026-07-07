@@ -86,19 +86,14 @@ func (wp *WorkerPool) process(ctx context.Context, workerID int, job *Job){
 
 func (wp *WorkerPool) scheduleRetry(ctx context.Context, job *Job){
 	delay := backoffDuration(job.Attempts)
-	log.Printf("job %s: retrying in %s", job.ID, &delay)
+	runAt := time.Now().Add(delay)
+	job.Status = StatusPending
 
-	go func(){
-		select {
-		case <-time.After(delay):
-			job.Status = StatusPending
-			if error := wp.queue.Enqueue(ctx, job); error != nil {
-				log.Printf("job %s: failed to requeue: %v", job.ID, error)
-			}
-		case <-ctx.Done():
-			log.Printf("job %s: retry cancelled due to shutdown", job.ID)
-		}
-	}()
+	log.Printf("job %s: scheduling retry at %s (in %s)", job.ID, runAt.Format(time.RFC3339), delay)
+
+	if error := wp.queue.EnqueueDelayed(ctx, job, runAt); error != nil {
+		log.Printf("job %s: failed to schedule retry: %v", job.ID, error)
+	}
 }
 
 func backoffDuration(attempt int) time.Duration{
@@ -122,3 +117,4 @@ func (wp *WorkerPool) moveToDeadLetter(ctx context.Context, job *Job){
 
 	log.Printf("job %s: moved to dead-letter queue after %d attempts", job.ID, job.Attempts)
 }
+
