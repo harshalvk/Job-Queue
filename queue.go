@@ -10,6 +10,7 @@ import (
 )
 
 const queueKey = "jobqueue:pending"
+const delayedKey = "jobqueue:delayed"
 
 type Queue struct {
 	rdb *redis.Client
@@ -117,4 +118,49 @@ func (q *Queue) RequeueDeadLetter(ctx context.Context, jobID string) error {
 // this deletes all dead-lettered jobs permanently
 func (q *Queue) PurgeDeadLetter(ctx context.Context) error {
 	return q.rdb.Del(ctx, deadLetterKey).Err()
+}
+
+// this function schedules a job to become available at runAt
+// stored in a redis sorted set, score = unix timestamp, so that it survives
+// proces restarts (unlike an in-memory goroutine timer)
+func (q *Queue) EnqueueDelayed(ctx context.Context, job *Job, runAt time.Time) error {
+	job.RunAt = runAt
+	data, error := json.Marshal(job)
+	if error != nil {
+		return fmt.Errorf("marshal job: %w", error)
+	}
+
+	return q.rdb.ZAdd(ctx, delayedKey, redis.Z{
+		Score: float64(runAt.Unix()),
+		Member: data,
+	}).Err()
+}
+
+// PromoteDueJobs finds jobs in the delayed set whose runAt has passed,
+// moves them into the pending queue, and removes them from the delayed set
+// returns how many jobs were promoted
+func (q *Queue) PromoteDueJobs(ctx context.Context) (int, error){
+	now := float64(time.Now().Unix())
+
+	// fetches all delayed jobs with the socre <= now (i.e due to run)
+	due, error := q.rdb.ZRangeByScore(ctx, delayedKey, &redis.ZRangeBy{
+		Min: "-inf",
+		Max: fmt.Sprintf("%f", now),
+	}).Result()
+
+	if error != nil {
+		return 0, fmt.Errorf("zrangebyscore: %w", error)
+	}
+
+	for _, data := range due {
+		// move atomatially (in a i think semi-automatic-way): push to pending, then remove from delayed
+		if error := q.rdb.LPush(ctx, queueKey, data).Err(); error != nil {
+			return 0, fmt.Errorf("push promoted job: %w", error)
+		}
+		if error := q.rdb.ZRem(ctx, delayedKey, data).Err(); error != nil {
+			return 0, fmt.Errorf("remove promoted job: %w", error)
+		}
+	}
+
+	return len(due), nil
 }
