@@ -1,6 +1,7 @@
 # Job Queue ![visitors](https://visitor-badge.laobi.icu/badge?page_id=harshalvk.job-queue&left_text=visitors&left_color=%234f4f4f&right_color=%23c48312)
 
-<img width="3000" height="1000" alt="image" src="https://github.com/user-attachments/assets/9bdd9b71-83dd-496a-93fe-f5d33de1f835" />
+<img width="1498" height="500" alt="image" src="https://github.com/user-attachments/assets/f6fffc1f-224b-4634-8d32-567b9abcc60e" />
+
 
 A distributed job queue built from scratch in Go — a mini Sidekiq/Celery, without reaching for an off-the-shelf framework. The goal is to actually understand the primitives (worker pools, retries, dead-lettering, backoff) rather than just importing a library that hides them.
 
@@ -8,7 +9,12 @@ Backed by Redis for the hot queue, with Postgres planned for durable job history
 
 ## Why build this instead of using an existing library?
 
-Libraries like Sidekiq, Celery, or Asynq solve this problem well — but using them skips past the actual mechanics: how does a worker pool avoid spawning unbounded goroutines? How do retries avoid hammering a failing dependency? How do you not lose jobs when a process crashes mid-retry? This project builds each of those pieces manually, one at a time, with the reasoning behind each design decision documented alongside the code.
+Libraries like Sidekiq, Celery, or Asynq solve this problem well — but using them skips past the actual mechanics: 
+- how does a worker pool avoid spawning unbounded goroutines?
+- How do retries avoid hammering a failing dependency?
+- How do you not lose jobs when a process crashes mid-retry?
+
+This project builds each of those pieces manually, one at a time, with the reasoning behind each design decision documented alongside the code.
 
 ## Project structure
 
