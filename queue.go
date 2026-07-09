@@ -164,3 +164,7 @@ func (q *Queue) PromoteDueJobs(ctx context.Context) (int, error){
 
 	return len(due), nil
 }
+
+func (q *Queue) Depth(ctx context.Context) (int64, error){
+	return q.rdb.LLen(ctx, queueKey).Result()
+}
