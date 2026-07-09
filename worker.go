@@ -67,12 +67,15 @@ func (wp *WorkerPool) process(ctx context.Context, workerID int, job *Job){
 
 	log.Printf("worker %d: processing job %s (%s)", workerID, job.ID, job.Type)
 
-	error := handler(ctx, job)
+	start := time.Now()
+	err := handler(ctx, job)
+	JobDuration.WithLabelValues(job.Type).Observe(time.Since(start).Seconds())
 
-	if error == nil {
+	if err == nil {
 		job.Status = StatusCompleted
-		if error := wp.store.RecordStatus(ctx, job); error != nil {
-			log.Printf("job %s: failed to recrod completed status: %v", job.ID, error)
+		JobsProcessed.WithLabelValues(job.Type, "completed").Inc()
+		if err := wp.store.RecordStatus(ctx, job); err != nil {
+			log.Printf("job %s: failed to recrod completed status: %v", job.ID, err)
 		}
 
 		log.Printf("worker %d: job %s completed", workerID, job.ID)
@@ -80,12 +83,13 @@ func (wp *WorkerPool) process(ctx context.Context, workerID int, job *Job){
 	}
 
 	job.Attempts++
-	job.LastError = error.Error()
+	job.LastError = err.Error()
 	job.Status = StatusFailed
+	JobsProcessed.WithLabelValues(job.Type, "failed").Inc()
 	if recError := wp.store.RecordCreated(ctx, job); recError != nil {
 		log.Printf("job %s: failed to record failed status: %v", job.ID, recError)
 	}
-	log.Printf("worker %d: job %s failed: %v", workerID, job.ID, error)
+	log.Printf("worker %d: job %s failed: %v", workerID, job.ID, err)
 
 	if job.Attempts >= job.MaxAttempts {
 		wp.moveToDeadLetter(ctx, job)
@@ -125,6 +129,7 @@ func (wp *WorkerPool) moveToDeadLetter(ctx context.Context, job *Job){
 		log.Printf("job %s: failed to move to dead letter: %v", job.ID, error)
 		return
 	}
+	JobsProcessed.WithLabelValues(job.Type, "dead_letter").Inc()
 	if error := wp.store.RecordStatus(ctx, job); error != nil {
 		log.Printf("job %s: failed to record dead-letter status: %v", job.ID, error)
 	}
