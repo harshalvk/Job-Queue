@@ -29,14 +29,27 @@ func (wp *WorkerPool) RegisterHandler(jobType string, h Handler){
 	wp.handlers[jobType] = h
 }
 
-func (wp *WorkerPool) Start(ctx context.Context){
+func (wp *WorkerPool) Start(ctx context.Context, shutdownTimeout time.Duration){
 	var wg sync.WaitGroup
 	for i := 0; i < wp.concurrency; i++ {
 		wg.Add(1)
 		workerID := i
 		go wp.runWorker(ctx, workerID, &wg)
 	}
-	wg.Wait()
+
+	// wait for either all workers to finish cleanly, or the timeout to expire
+	done := make(chan struct{})
+	go func ()  {	
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		log.Println("all workers exited cleanly")
+	case <-time.After(shutdownTimeout):
+		log.Printf("shutdown timeout (%s) exceeded, some workers may still be mid-job", shutdownTimeout)
+	}
 }
 
 func (wp *WorkerPool) runWorker(ctx context.Context, id int, wg *sync.WaitGroup) {
@@ -44,7 +57,7 @@ func (wp *WorkerPool) runWorker(ctx context.Context, id int, wg *sync.WaitGroup)
 	for {
 		select {
 		case <-ctx.Done():
-			log.Printf("worker %d: shutting down", id)
+			log.Printf("worker %d: shutdown signal received, no longer picking up new jobs", id)
 			return
 		default:
 		}
