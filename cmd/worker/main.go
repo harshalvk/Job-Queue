@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"os/signal"
 	"syscall"
 	"time"
@@ -34,7 +35,7 @@ func sendEmailHandler(ctx context.Context, job *jobqueue.Job) error {
 }
 
 func main() {
-		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
 	rdb := redis.NewClient(&redis.Options{Addr: "localhost:6379"})
@@ -47,7 +48,13 @@ func main() {
 	defer db.Close()
 	store := jobqueue.NewStore(db)
 
-	pool := jobqueue.NewWorkerPool(queue, store, 5) // 5 concurrent workers
+	nodeID := os.Getenv("NODE_ID")
+	if nodeID == "" {
+		hostname, _ := os.Hostname()
+		nodeID = hostname
+	}
+
+	pool := jobqueue.NewWorkerPool(queue, store, 5, nodeID) // 5 concurrent workers
 	pool.RegisterHandler("send_email", sendEmailHandler)
 
 	go func ()  {			

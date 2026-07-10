@@ -14,14 +14,16 @@ type WorkerPool struct {
 	store *Store
 	handlers map[string]Handler
 	concurrency int
+	nodeID string
 }
 
-func NewWorkerPool(queue *Queue, store *Store, concurrency int) *WorkerPool {
+func NewWorkerPool(queue *Queue, store *Store, concurrency int, nodeID string) *WorkerPool {
 	return &WorkerPool{
 		queue: queue,
 		store: store,
 		handlers: make(map[string]Handler),
 		concurrency: concurrency,
+		nodeID: nodeID,
 	}
 }
 
@@ -78,7 +80,7 @@ func (wp *WorkerPool) process(ctx context.Context, workerID int, job *Job){
 		return
 	}
 
-	log.Printf("worker %d: processing job %s (%s)", workerID, job.ID, job.Type)
+	log.Printf("[%s] worker %d: processing job %s (%s), attempt %d/%d", wp.nodeID, workerID, job.ID, job.Type, job.Attempts+1, job.MaxAttempts)
 
 	start := time.Now()
 	err := handler(ctx, job)
