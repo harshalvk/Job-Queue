@@ -2,6 +2,7 @@ package jobqueue
 
 import "github.com/prometheus/client_golang/prometheus"
 
+// Metrics exposed by the job queue, registered globally on package init.
 var (
 	JobsProcessed = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
@@ -11,15 +12,18 @@ var (
 		[]string{"type", "outcome"},
 	)
 
+	// JobDuration measures how long each job's handler takes to run.
 	JobDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name: "jobqueue_job_duration_seconds",
-			Help: "Duration of job handler exectuion in seconds.",
+			Name:    "jobqueue_job_duration_seconds",
+			Help:    "Duration of job handler exectuion in seconds.",
 			Buckets: prometheus.DefBuckets,
 		},
 		[]string{"type"},
 	)
 
+	// QueueDepth reports how many jobs are currently waiting in the
+	// pending queue.
 	QueueDepth = prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Name: "jobqueue_pending_depth",

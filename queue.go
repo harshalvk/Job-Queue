@@ -12,34 +12,39 @@ import (
 const queueKey = "jobqueue:pending"
 const delayedKey = "jobqueue:delayed"
 
+// Queue wraps a Redis client to provide job enqueue/dequeue operations.
 type Queue struct {
 	rdb *redis.Client
 }
 
-func NewQueue(rdb *redis.Client) * Queue {
+// NewQueue creates a Queue backed by the given Redis client.
+func NewQueue(rdb *redis.Client) *Queue {
 	return &Queue{rdb}
 }
 
+// Enqueue pushes a job onto the pending queue.
 func (q *Queue) Enqueue(ctx context.Context, job *Job) error {
-	data, error := json.Marshal(job)
+	data, err := json.Marshal(job)
 
-	if error != nil {
-		return fmt.Errorf("marshal job: %w", error)
+	if err != nil {
+		return fmt.Errorf("marshal job: %w", err)
 	}
 
-	return q.rdb.LPush(ctx, queueKey, data).Err() 
-} 
+	return q.rdb.LPush(ctx, queueKey, data).Err()
+}
 
+// Dequeue blocks until a job is available, then returns it.
+// A timeout of 0 means block forever.
 func (q *Queue) Dequeue(ctx context.Context, timeout time.Duration) (*Job, error) {
-	result, error := q.rdb.BRPop(ctx, timeout, queueKey).Result()
+	result, err := q.rdb.BRPop(ctx, timeout, queueKey).Result()
 
-	if error != nil {
-		return nil, error
+	if err != nil {
+		return nil, err
 	}
 
 	var job Job
-	if error := json.Unmarshal([]byte(result[1]), &job); error != nil {
-		return nil, fmt.Errorf("unmarshal job: %w", error)
+	if err := json.Unmarshal([]byte(result[1]), &job); err != nil {
+		return nil, fmt.Errorf("unmarshal job: %w", err)
 	}
 
 	return &job, nil
@@ -47,37 +52,38 @@ func (q *Queue) Dequeue(ctx context.Context, timeout time.Duration) (*Job, error
 
 const deadLetterKey = "jobqueue:dead_letter"
 
-// this function stores a permanently-faiiled job in the dead-letter list
+// MoveToDeadLetter stores a permanently-failed job in the dead-letter list.
 func (q *Queue) MoveToDeadLetter(ctx context.Context, job *Job) error {
-	data, error := json.Marshal(job)
+	data, err := json.Marshal(job)
 
-	if error != nil {
-		return fmt.Errorf("marshal job: %w", error)
+	if err != nil {
+		return fmt.Errorf("marshal job: %w", err)
 	}
 
 	return q.rdb.LPush(ctx, deadLetterKey, data).Err()
 }
 
-// this function returns up to `limit` dead-lettered jobs without removing them
-func (q *Queue) ListDeadLetter(ctx context.Context, limit int64) ([]*Job, error){
+// ListDeadLetter returns up to limit dead-lettered jobs without removing
+// them. Pass limit = -1 to return all jobs.
+func (q *Queue) ListDeadLetter(ctx context.Context, limit int64) ([]*Job, error) {
 	stop := limit - 1
 	if limit < 0 {
 		stop = -1
 	}
 
-	raw, error := q.rdb.LRange(ctx, deadLetterKey, 0, stop).Result()
+	raw, err := q.rdb.LRange(ctx, deadLetterKey, 0, stop).Result()
 
-	if error != nil {
-		return nil, fmt.Errorf("lrange dead letter: %w", error)
+	if err != nil {
+		return nil, fmt.Errorf("lrange dead letter: %w", err)
 	}
 
 	jobs := make([]*Job, 0, len(raw))
 
 	for _, item := range raw {
 		var job Job
-		
-		if error := json.Unmarshal([]byte(item), &job); error != nil {
-			return nil, fmt.Errorf("unmarshal dead letter job: %w", error)
+
+		if err := json.Unmarshal([]byte(item), &job); err != nil {
+			return nil, fmt.Errorf("unmarshal dead letter job: %w", err)
 		}
 
 		jobs = append(jobs, &job)
@@ -86,11 +92,13 @@ func (q *Queue) ListDeadLetter(ctx context.Context, limit int64) ([]*Job, error)
 	return jobs, nil
 }
 
+// RequeueDeadLetter pulls one job off the dead-letter list and re-enqueues
+// it, resetting its attempt count so it gets a fresh set of retries.
 func (q *Queue) RequeueDeadLetter(ctx context.Context, jobID string) error {
-	jobs, error := q.ListDeadLetter(ctx, -1) // -1 -> all
+	jobs, err := q.ListDeadLetter(ctx, -1) // -1 -> all
 
-	if error != nil  {
-		return error
+	if err != nil {
+		return err
 	}
 
 	for _, job := range jobs {
@@ -99,10 +107,13 @@ func (q *Queue) RequeueDeadLetter(ctx context.Context, jobID string) error {
 		}
 
 		// remove the specific job from the dead-letter list
-		data, _ := json.Marshal(job)
+		data, err := json.Marshal(job)
+		if err != nil {
+			return fmt.Errorf("marshal job for dead-letter removal: %w", err)
+		}
 
-		if error := q.rdb.LRem(ctx, deadLetterKey, 1, data).Err(); error != nil {
-			return fmt.Errorf("remove from dead letter: %w", error)
+		if err := q.rdb.LRem(ctx, deadLetterKey, 1, data).Err(); err != nil {
+			return fmt.Errorf("remove from dead letter: %w", err)
 		}
 
 		job.Attempts = 0
@@ -115,56 +126,58 @@ func (q *Queue) RequeueDeadLetter(ctx context.Context, jobID string) error {
 	return fmt.Errorf("job %s not found in dead letter queue", jobID)
 }
 
-// this deletes all dead-lettered jobs permanently
+// PurgeDeadLetter deletes all dead-lettered jobs permanently.
 func (q *Queue) PurgeDeadLetter(ctx context.Context) error {
 	return q.rdb.Del(ctx, deadLetterKey).Err()
 }
 
-// this function schedules a job to become available at runAt
-// stored in a redis sorted set, score = unix timestamp, so that it survives
-// proces restarts (unlike an in-memory goroutine timer)
+// EnqueueDelayed schedules a job to become available at runAt, stored in a
+// Redis sorted set keyed by Unix timestamp so it survives process restarts.
 func (q *Queue) EnqueueDelayed(ctx context.Context, job *Job, runAt time.Time) error {
 	job.RunAt = runAt
-	data, error := json.Marshal(job)
-	if error != nil {
-		return fmt.Errorf("marshal job: %w", error)
+	data, err := json.Marshal(job)
+	if err != nil {
+		return fmt.Errorf("marshal job: %w", err)
 	}
 
 	return q.rdb.ZAdd(ctx, delayedKey, redis.Z{
-		Score: float64(runAt.Unix()),
+		Score:  float64(runAt.Unix()),
 		Member: data,
 	}).Err()
 }
 
 // PromoteDueJobs finds jobs in the delayed set whose runAt has passed,
-// moves them into the pending queue, and removes them from the delayed set
-// returns how many jobs were promoted
-func (q *Queue) PromoteDueJobs(ctx context.Context) (int, error){
+// moves them into the pending queue, and removes them from the delayed
+// set. Returns how many jobs were promoted.
+func (q *Queue) PromoteDueJobs(ctx context.Context) (int, error) {
 	now := float64(time.Now().Unix())
 
 	// fetches all delayed jobs with the socre <= now (i.e due to run)
-	due, error := q.rdb.ZRangeByScore(ctx, delayedKey, &redis.ZRangeBy{
-		Min: "-inf",
-		Max: fmt.Sprintf("%f", now),
+	due, err := q.rdb.ZRangeArgs(ctx, redis.ZRangeArgs{
+		Key:     delayedKey,
+		Start:   "-inf",
+		Stop:    fmt.Sprintf("%f", now),
+		ByScore: true,
 	}).Result()
 
-	if error != nil {
-		return 0, fmt.Errorf("zrangebyscore: %w", error)
+	if err != nil {
+		return 0, fmt.Errorf("zrangebyscore: %w", err)
 	}
 
 	for _, data := range due {
 		// move atomatially (in a i think semi-automatic-way): push to pending, then remove from delayed
-		if error := q.rdb.LPush(ctx, queueKey, data).Err(); error != nil {
-			return 0, fmt.Errorf("push promoted job: %w", error)
+		if err := q.rdb.LPush(ctx, queueKey, data).Err(); err != nil {
+			return 0, fmt.Errorf("push promoted job: %w", err)
 		}
-		if error := q.rdb.ZRem(ctx, delayedKey, data).Err(); error != nil {
-			return 0, fmt.Errorf("remove promoted job: %w", error)
+		if err := q.rdb.ZRem(ctx, delayedKey, data).Err(); err != nil {
+			return 0, fmt.Errorf("remove promoted job: %w", err)
 		}
 	}
 
 	return len(due), nil
 }
 
-func (q *Queue) Depth(ctx context.Context) (int64, error){
+// Depth returns the current number of pending jobs.
+func (q *Queue) Depth(ctx context.Context) (int64, error) {
 	return q.rdb.LLen(ctx, queueKey).Result()
 }

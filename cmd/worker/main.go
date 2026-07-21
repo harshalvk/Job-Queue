@@ -1,3 +1,5 @@
+// Command worker runs the worker pool, processing jobs and serving
+// Prometheus metrics.
 package main
 
 import (
@@ -28,7 +30,7 @@ import (
 // }
 
 // simulated version to fail a job
-func sendEmailHandler(ctx context.Context, job *jobqueue.Job) error {
+func sendEmailHandler(_ context.Context, job *jobqueue.Job) error {
 	time.Sleep(5 * time.Second)
 	fmt.Printf("email send for job %s\n", job.ID)
 	return nil
@@ -41,23 +43,26 @@ func main() {
 	rdb := redis.NewClient(&redis.Options{Addr: "localhost:6379"})
 	queue := jobqueue.NewQueue(rdb)
 
-	db, error := pgxpool.New(ctx, "postgres://postgres:postgres@localhost:5432/postgres")
-	if error != nil {
-		panic(error)
+	db, err := pgxpool.New(ctx, "postgres://postgres:postgres@localhost:5432/postgres")
+	if err != nil {
+		panic(err)
 	}
 	defer db.Close()
 	store := jobqueue.NewStore(db)
 
 	nodeID := os.Getenv("NODE_ID")
 	if nodeID == "" {
-		hostname, _ := os.Hostname()
+		hostname, err := os.Hostname()
+		if err != nil {
+			hostname = "unknown"
+		}
 		nodeID = hostname
 	}
 
 	pool := jobqueue.NewWorkerPool(queue, store, 5, nodeID) // 5 concurrent workers
 	pool.RegisterHandler("send_email", sendEmailHandler)
 
-	go func ()  {			
+	go func() {
 		http.Handle("/metrics", promhttp.Handler())
 		log.Println("metrics server listening on :2112/metrics")
 		if err := http.ListenAndServe(":2112", nil); err != nil {
@@ -65,14 +70,14 @@ func main() {
 		}
 	}()
 
-	go func ()  {				
+	go func() {
 		ticker := time.NewTicker(2 * time.Second)
 		defer ticker.Stop()
 		for {
 			select {
-			case <- ctx.Done():
+			case <-ctx.Done():
 				return
-			case <- ticker.C:
+			case <-ticker.C:
 				depth, err := queue.Depth(ctx)
 				if err != nil {
 					continue
@@ -85,4 +90,4 @@ func main() {
 	fmt.Println("worker pool started, waiting for jobs...")
 	pool.Start(ctx, 30*time.Second)
 	fmt.Println("worker pool stopped")
-} 
+}
