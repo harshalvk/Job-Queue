@@ -1,4 +1,4 @@
-.PHONY: help build test lint fmt vet migrate vuln sec run-worker run-producer run-scheduler run-deadletter docker-up docker-down docker-logs clean
+.PHONY: help build test lint fmt vet migrate vuln sec run-worker run-producer run-scheduler run-deadletter docker-up docker-down docker-logs clean docker-build-worker docker-build-scheduler docker-build-producer docker-build-deadletter
 
 build:
 	go build -o bin/producer.exe ./cmd/producer
@@ -51,3 +51,15 @@ vuln:
 
 sec:
 	gosec ./...
+
+docker-build-worker:
+	docker build --build-arg CMD_PATH=cmd/worker -t jobqueue-worker .
+
+docker-build-scheduler:
+	docker build --build-arg CMD_PATH=cmd/scheduler -t jobqueue-scheduler .
+
+docker-build-producer:
+	docker build --build-arg CMD_PATH=cmd/producer -t jobqueue-producer .
+
+docker-build-deadletter:
+	docker build --build-arg CMD_PATH=cmd/deadletter -t jobqueue-deadletter .

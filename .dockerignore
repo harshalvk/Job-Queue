@@ -1,0 +1,7 @@
+.git
+bin/
+docs/
+*.md
+.golangci.yml
+.editorconfig
+lefthook.yml
