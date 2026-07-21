@@ -1,5 +1,8 @@
 # Job Queue ![visitors](https://visitor-badge.laobi.icu/badge?page_id=harshalvk.job-queue&left_text=visitors&left_color=%234f4f4f&right_color=%23c48312)
-
+# jobqueue
+[![CI](https://github.com/harshalvk/jobqueue/actions/workflows/ci.yml/badge.svg)](https://github.com/harshalvk/jobqueue/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/harshalvk/jobqueue)](https://goreportcard.com/report/github.com/harshalvk/jobqueue)
+[![Go Reference](https://pkg.go.dev/badge/github.com/harshalvk/jobqueue.svg)](https://pkg.go.dev/github.com/harshalvk/jobqueue)
 <img width="1498" height="288" alt="image" src="https://github.com/user-attachments/assets/1622967b-2453-490e-ae40-432183abacda" />
 
 
@@ -84,3 +87,8 @@ docker compose down -v
 - github.com/jackc/pgx/v5/pgxpool
 - github.com/prometheus/client_golang
 > README.md is ai-generated
+
+## Documentation
+
+- [Contributing guide](CONTRIBUTING.md) — setup, commands, commit conventions
+- [Architecture Decision Records](docs/adr/README.md) — the reasoning behind major design choices
