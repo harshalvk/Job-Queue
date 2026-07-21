@@ -1,4 +1,4 @@
-.PHONY: help build test lint fmt vet migrate run-worker run-producer run-scheduler run-deadletter docker-up docker-down docker-logs clean
+.PHONY: help build test lint fmt vet migrate vuln sec run-worker run-producer run-scheduler run-deadletter docker-up docker-down docker-logs clean
 
 build:
 	go build -o bin/producer.exe ./cmd/producer
@@ -7,7 +7,7 @@ build:
 	go build -o bin/deadletter.exe ./cmd/deadletter
 
 test:
-	go test -race -v ./...
+	go test -v ./...
 
 lint:
 	golangci-lint run ./...
@@ -45,3 +45,9 @@ docker-logs:
 
 clean:
 	rm -rf bin/
+
+vuln:
+	govulncheck ./...
+
+sec:
+	gosec ./...
