@@ -1,6 +1,6 @@
-// Package jobqueue implements a distributed job queue backed by Redis,
-// with worker pools, retries, dead-lettering, and Postgres-backed history.
-package jobqueue
+// Package job defines the core Job domain model shared across the queue,
+// worker, and store packages.
+package job
 
 import (
 	"encoding/json"
@@ -9,16 +9,16 @@ import (
 	"github.com/google/uuid"
 )
 
-// JobStatus represents the current lifecycle state of a Job.
-type JobStatus string
+// Status represents the current lifecycle state of a Job.
+type Status string
 
 // Possible values for JobStatus.
 const (
-	StatusPending    JobStatus = "pending"
-	StatusProcessing JobStatus = "processing"
-	StatusCompleted  JobStatus = "completed"
-	StatusFailed     JobStatus = "failed"
-	StatusDeadLetter JobStatus = "dead_letter"
+	StatusPending    Status = "pending"
+	StatusProcessing Status = "processing"
+	StatusCompleted  Status = "completed"
+	StatusFailed     Status = "failed"
+	StatusDeadLetter Status = "dead_letter"
 )
 
 // Job represents a single unit of work to be processed by a worker.
@@ -26,7 +26,7 @@ type Job struct {
 	ID          string          `json:"id"`
 	Type        string          `json:"type"`
 	Payload     json.RawMessage `json:"payload"`
-	Status      JobStatus       `json:"status"`
+	Status      Status          `json:"status"`
 	Attempts    int             `json:"attempts"`
 	MaxAttempts int             `json:"max_attempts"`
 	CreatedAt   time.Time       `json:"created_at"`

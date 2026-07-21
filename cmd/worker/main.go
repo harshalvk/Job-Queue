@@ -12,7 +12,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/harshalvk/jobqueue"
+	"github.com/harshalvk/jobqueue/internal/job"
+	"github.com/harshalvk/jobqueue/internal/metrics"
+	"github.com/harshalvk/jobqueue/internal/queue"
+	"github.com/harshalvk/jobqueue/internal/store"
+	"github.com/harshalvk/jobqueue/internal/worker"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
@@ -30,9 +34,9 @@ import (
 // }
 
 // simulated version to fail a job
-func sendEmailHandler(_ context.Context, job *jobqueue.Job) error {
+func sendEmailHandler(_ context.Context, j *job.Job) error {
 	time.Sleep(5 * time.Second)
-	fmt.Printf("email send for job %s\n", job.ID)
+	fmt.Printf("email send for job %s\n", j.ID)
 	return nil
 }
 
@@ -41,14 +45,14 @@ func main() {
 	defer stop()
 
 	rdb := redis.NewClient(&redis.Options{Addr: "localhost:6379"})
-	queue := jobqueue.NewQueue(rdb)
+	queue := queue.NewQueue(rdb)
 
 	db, err := pgxpool.New(ctx, "postgres://postgres:postgres@localhost:5432/postgres")
 	if err != nil {
 		panic(err)
 	}
 	defer db.Close()
-	store := jobqueue.NewStore(db)
+	store := store.NewStore(db)
 
 	nodeID := os.Getenv("NODE_ID")
 	if nodeID == "" {
@@ -59,7 +63,7 @@ func main() {
 		nodeID = hostname
 	}
 
-	pool := jobqueue.NewWorkerPool(queue, store, 5, nodeID) // 5 concurrent workers
+	pool := worker.NewWorkerPool(queue, store, 5, nodeID) // 5 concurrent workers
 	pool.RegisterHandler("send_email", sendEmailHandler)
 
 	go func() {
@@ -82,7 +86,7 @@ func main() {
 				if err != nil {
 					continue
 				}
-				jobqueue.QueueDepth.Set(float64(depth))
+				metrics.QueueDepth.Set(float64(depth))
 			}
 		}
 	}()

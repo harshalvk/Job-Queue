@@ -1,4 +1,6 @@
-package jobqueue
+// Package queue implements a Redis-backed job queue: pending, dead-letter,
+// and delayed job storage.
+package queue
 
 import (
 	"context"
@@ -6,11 +8,15 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/harshalvk/jobqueue/internal/job"
 	"github.com/redis/go-redis/v9"
 )
 
-const queueKey = "jobqueue:pending"
-const delayedKey = "jobqueue:delayed"
+const (
+	queueKey      = "jobqueue:pending"
+	deadLetterKey = "jobqueue:dead_letter"
+	delayedKey    = "jobqueue:delayed"
+)
 
 // Queue wraps a Redis client to provide job enqueue/dequeue operations.
 type Queue struct {
@@ -23,8 +29,8 @@ func NewQueue(rdb *redis.Client) *Queue {
 }
 
 // Enqueue pushes a job onto the pending queue.
-func (q *Queue) Enqueue(ctx context.Context, job *Job) error {
-	data, err := json.Marshal(job)
+func (q *Queue) Enqueue(ctx context.Context, j *job.Job) error {
+	data, err := json.Marshal(j)
 
 	if err != nil {
 		return fmt.Errorf("marshal job: %w", err)
@@ -35,26 +41,24 @@ func (q *Queue) Enqueue(ctx context.Context, job *Job) error {
 
 // Dequeue blocks until a job is available, then returns it.
 // A timeout of 0 means block forever.
-func (q *Queue) Dequeue(ctx context.Context, timeout time.Duration) (*Job, error) {
+func (q *Queue) Dequeue(ctx context.Context, timeout time.Duration) (*job.Job, error) {
 	result, err := q.rdb.BRPop(ctx, timeout, queueKey).Result()
 
 	if err != nil {
 		return nil, err
 	}
 
-	var job Job
-	if err := json.Unmarshal([]byte(result[1]), &job); err != nil {
+	var j job.Job
+	if err := json.Unmarshal([]byte(result[1]), &j); err != nil {
 		return nil, fmt.Errorf("unmarshal job: %w", err)
 	}
 
-	return &job, nil
+	return &j, nil
 }
 
-const deadLetterKey = "jobqueue:dead_letter"
-
 // MoveToDeadLetter stores a permanently-failed job in the dead-letter list.
-func (q *Queue) MoveToDeadLetter(ctx context.Context, job *Job) error {
-	data, err := json.Marshal(job)
+func (q *Queue) MoveToDeadLetter(ctx context.Context, j *job.Job) error {
+	data, err := json.Marshal(j)
 
 	if err != nil {
 		return fmt.Errorf("marshal job: %w", err)
@@ -65,7 +69,7 @@ func (q *Queue) MoveToDeadLetter(ctx context.Context, job *Job) error {
 
 // ListDeadLetter returns up to limit dead-lettered jobs without removing
 // them. Pass limit = -1 to return all jobs.
-func (q *Queue) ListDeadLetter(ctx context.Context, limit int64) ([]*Job, error) {
+func (q *Queue) ListDeadLetter(ctx context.Context, limit int64) ([]*job.Job, error) {
 	stop := limit - 1
 	if limit < 0 {
 		stop = -1
@@ -77,16 +81,16 @@ func (q *Queue) ListDeadLetter(ctx context.Context, limit int64) ([]*Job, error)
 		return nil, fmt.Errorf("lrange dead letter: %w", err)
 	}
 
-	jobs := make([]*Job, 0, len(raw))
+	jobs := make([]*job.Job, 0, len(raw))
 
 	for _, item := range raw {
-		var job Job
+		var j job.Job
 
-		if err := json.Unmarshal([]byte(item), &job); err != nil {
+		if err := json.Unmarshal([]byte(item), &j); err != nil {
 			return nil, fmt.Errorf("unmarshal dead letter job: %w", err)
 		}
 
-		jobs = append(jobs, &job)
+		jobs = append(jobs, &j)
 	}
 
 	return jobs, nil
@@ -101,13 +105,13 @@ func (q *Queue) RequeueDeadLetter(ctx context.Context, jobID string) error {
 		return err
 	}
 
-	for _, job := range jobs {
-		if job.ID != jobID {
+	for _, j := range jobs {
+		if j.ID != jobID {
 			continue
 		}
 
 		// remove the specific job from the dead-letter list
-		data, err := json.Marshal(job)
+		data, err := json.Marshal(j)
 		if err != nil {
 			return fmt.Errorf("marshal job for dead-letter removal: %w", err)
 		}
@@ -116,11 +120,11 @@ func (q *Queue) RequeueDeadLetter(ctx context.Context, jobID string) error {
 			return fmt.Errorf("remove from dead letter: %w", err)
 		}
 
-		job.Attempts = 0
-		job.Status = StatusPending
-		job.LastError = ""
+		j.Attempts = 0
+		j.Status = job.StatusPending
+		j.LastError = ""
 
-		return q.Enqueue(ctx, job)
+		return q.Enqueue(ctx, j)
 	}
 
 	return fmt.Errorf("job %s not found in dead letter queue", jobID)
@@ -133,9 +137,9 @@ func (q *Queue) PurgeDeadLetter(ctx context.Context) error {
 
 // EnqueueDelayed schedules a job to become available at runAt, stored in a
 // Redis sorted set keyed by Unix timestamp so it survives process restarts.
-func (q *Queue) EnqueueDelayed(ctx context.Context, job *Job, runAt time.Time) error {
-	job.RunAt = runAt
-	data, err := json.Marshal(job)
+func (q *Queue) EnqueueDelayed(ctx context.Context, j *job.Job, runAt time.Time) error {
+	j.RunAt = runAt
+	data, err := json.Marshal(j)
 	if err != nil {
 		return fmt.Errorf("marshal job: %w", err)
 	}

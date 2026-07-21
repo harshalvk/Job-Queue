@@ -7,13 +7,13 @@ import (
 	"log"
 	"time"
 
-	"github.com/harshalvk/jobqueue"
+	"github.com/harshalvk/jobqueue/internal/queue"
 	"github.com/redis/go-redis/v9"
 )
 
 func main() {
 	rdb := redis.NewClient(&redis.Options{Addr: "localhost:6379"})
-	q := jobqueue.NewQueue(rdb)
+	q := queue.NewQueue(rdb)
 	ctx := context.Background()
 
 	ticker := time.NewTicker(1 * time.Second)

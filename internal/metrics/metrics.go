@@ -1,4 +1,5 @@
-package jobqueue
+// Package metrics defines the Prometheus metrics exposed by the job queue.
+package metrics
 
 import "github.com/prometheus/client_golang/prometheus"
 

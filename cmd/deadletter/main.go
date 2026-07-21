@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/harshalvk/jobqueue"
+	"github.com/harshalvk/jobqueue/internal/queue"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -17,7 +17,7 @@ func main() {
 	flag.Parse()
 
 	rdb := redis.NewClient(&redis.Options{Addr: "localhost:6379"})
-	q := jobqueue.NewQueue(rdb)
+	q := queue.NewQueue(rdb)
 	ctx := context.Background()
 
 	switch *action {
