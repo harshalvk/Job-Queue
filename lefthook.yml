@@ -1,0 +1,20 @@
+pre-commit:
+  parallel: true
+  commands:
+    fmt:
+      glob: "*.go"
+      run: gofmt -l {staged_files}
+      fail_text: "Files are not gofmt-formatted. Run `make fmt` and re-stage."
+
+    lint:
+      glob: "*.go"
+      run: golangci-lint run --new-from-rev=HEAD {staged_files}
+
+    vet:
+      glob: "*.go"
+      run: go vet ./...
+
+pre-push:
+  commands:
+    test:
+      run: go test -race ./...
