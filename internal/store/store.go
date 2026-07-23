@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/harshalvk/jobqueue/internal/job"
+	"github.com/harshalvk/kairos/internal/job"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 

@@ -1,19 +1,23 @@
 # ADR 0004: Dead-lettered jobs live in a separate Redis list
 
 ## Status
+
 Accepted
 
 ## Context
+
 Jobs that exhaust all retry attempts need to go somewhere other than
 being silently dropped, but they also shouldn't keep being picked up by
 workers as if they were still runnable.
 
 ## Decision
+
 Move permanently-failed jobs to a separate Redis list
-(`jobqueue:dead_letter`), distinct from the pending queue, with explicit
+(`kairos:dead_letter`), distinct from the pending queue, with explicit
 list/requeue/purge operations (`cmd/deadletter`).
 
 ## Consequences
+
 - Workers never waste cycles retrying something already known to be
   permanently broken, since dead-lettered jobs are structurally outside
   the pending queue.

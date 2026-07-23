@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/harshalvk/jobqueue/internal/job"
-	"github.com/harshalvk/jobqueue/internal/queue"
+	"github.com/harshalvk/kairos/internal/job"
+	"github.com/harshalvk/kairos/internal/queue"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

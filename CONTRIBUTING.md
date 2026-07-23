@@ -1,6 +1,7 @@
 # Contributing
 
 ## Prerequisites
+
 - Go 1.22+
 - Docker + Docker Compose
 - [`golangci-lint`](https://golangci-lint.run/welcome/install/)
@@ -9,8 +10,8 @@
 ## Setup
 
 ```bash
-git clone https://github.com/harshalvk/jobqueue.git
-cd jobqueue
+git clone https://github.com/harshalvk/kairos.git
+cd kairos
 lefthook install
 make docker-up
 make migrate
@@ -20,16 +21,16 @@ make migrate
 
 Run `make help` for the full list. The ones you'll use most:
 
-| Command | What it does |
-|---|---|
-| `make run-worker` | Start the worker pool |
-| `make run-producer` | Enqueue a test job |
-| `make run-scheduler` | Start the delayed-job scheduler |
-| `make lint` | Run golangci-lint |
-| `make fmt` | Format with goimports |
-| `make test` | Run tests (unit + testcontainers integration) |
-| `make vuln` | Check dependencies for known CVEs |
-| `make sec` | Run gosec security scan |
+| Command              | What it does                                  |
+| -------------------- | --------------------------------------------- |
+| `make run-worker`    | Start the worker pool                         |
+| `make run-producer`  | Enqueue a test job                            |
+| `make run-scheduler` | Start the delayed-job scheduler               |
+| `make lint`          | Run golangci-lint                             |
+| `make fmt`           | Format with goimports                         |
+| `make test`          | Run tests (unit + testcontainers integration) |
+| `make vuln`          | Check dependencies for known CVEs             |
+| `make sec`           | Run gosec security scan                       |
 
 ## Before committing
 

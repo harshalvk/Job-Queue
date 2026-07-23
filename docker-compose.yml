@@ -1,7 +1,7 @@
 services:
   db:
     image: postgres:16-alpine
-    container_name: jobqueue-db
+    container_name: kairos-db
     ports:
       - 5432:5432
     environment:
@@ -11,7 +11,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: jobqueue-redis
+    container_name: kairos-redis
     ports:
       - 6379:6379
     volumes:

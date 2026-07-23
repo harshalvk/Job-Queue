@@ -1,23 +1,27 @@
 # ADR 0009: Job dependencies via a waiting hash + reverse-dependency index
 
 ## Status
+
 Accepted
 
 ## Context
+
 Some jobs should only run after other specific jobs succeed (e.g.
 resize an image, then notify). The queue had no concept of ordering
 or relationships between jobs.
 
 ## Decision
-Jobs with dependencies are held in a Redis hash (`jobqueue:waiting`)
+
+Jobs with dependencies are held in a Redis hash (`kairos:waiting`)
 instead of the pending queue, with a per-job outstanding-dependency
-counter and a reverse index (`jobqueue:dependents:<id>`) mapping each
+counter and a reverse index (`kairos:dependents:<id>`) mapping each
 dependency to the jobs waiting on it. On successful completion,
 ResolveDependents decrements counters for dependents and enqueues any
 that reach zero. On permanent failure (dead-letter), CascadeFailDependents
 walks the reverse index and dead-letters all transitive dependents too.
 
 ## Consequences
+
 - Dependency resolution on completion is O(direct dependents), not a
   scan of all waiting jobs — the reverse index makes "who's waiting on
   me" a direct lookup.

@@ -38,13 +38,13 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: jobqueue
-          POSTGRES_PASSWORD: jobqueue
-          POSTGRES_DB: jobqueue
+          POSTGRES_USER: kairos
+          POSTGRES_PASSWORD: kairos
+          POSTGRES_DB: kairos
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U jobqueue"
+          --health-cmd "pg_isready -U kairos"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -59,7 +59,7 @@ jobs:
 
       - name: Apply migrations
         run: |
-          PGPASSWORD=jobqueue psql -h localhost -U jobqueue -d jobqueue -f migrations/0001_init.sql
+          PGPASSWORD=kairos psql -h localhost -U kairos -d kairos -f migrations/0001_init.sql
 
       - name: Run tests
         run: go test -race -v ./...

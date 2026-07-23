@@ -9,28 +9,28 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/harshalvk/jobqueue/internal/job"
+	"github.com/harshalvk/kairos/internal/job"
 	"github.com/redis/go-redis/v9"
 )
 
 const (
-	queueKey      = "jobqueue:pending"
-	deadLetterKey = "jobqueue:dead_letter"
-	delayedKey    = "jobqueue:delayed"
+	queueKey      = "kairos:pending"
+	deadLetterKey = "kairos:dead_letter"
+	delayedKey    = "kairos:delayed"
 )
 
 const (
-	waitingKey            = "jobqueue:waiting"
-	waitingCountKeyPrefix = "jobqueue:waiting:count:"
-	dependentsKeyPrefix   = "jobqueue:dependents:"
+	waitingKey            = "kairos:waiting"
+	waitingCountKeyPrefix = "kairos:waiting:count:"
+	dependentsKeyPrefix   = "kairos:dependents:"
 )
 
-const idempotencyKeyPrefix = "jobqueue:idempotency:"
+const idempotencyKeyPrefix = "kairos:idempotency:"
 
 var pendingKeys = map[job.Priority]string{
-	job.PriorityHigh:    "jobqueue:pending:high",
-	job.PriorityDefault: "jobqueue:pending:default",
-	job.PriorityLow:     "jobqueue:pending:low",
+	job.PriorityHigh:    "kairos:pending:high",
+	job.PriorityDefault: "kairos:pending:default",
+	job.PriorityLow:     "kairos:pending:low",
 }
 
 // dequeueOrder defines the prioiryt check order - high checked firs,

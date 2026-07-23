@@ -8,10 +8,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/harshalvk/jobqueue/internal/job"
-	"github.com/harshalvk/jobqueue/internal/metrics"
-	"github.com/harshalvk/jobqueue/internal/queue"
-	"github.com/harshalvk/jobqueue/internal/store"
+	"github.com/harshalvk/kairos/internal/job"
+	"github.com/harshalvk/kairos/internal/metrics"
+	"github.com/harshalvk/kairos/internal/queue"
+	"github.com/harshalvk/kairos/internal/store"
 )
 
 // Handler processes a single job. Returning an error means the job failed.

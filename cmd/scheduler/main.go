@@ -7,7 +7,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/harshalvk/jobqueue/internal/queue"
+	"github.com/harshalvk/kairos/internal/queue"
 	"github.com/redis/go-redis/v9"
 )
 

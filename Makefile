@@ -19,8 +19,8 @@ vet:
 	go vet ./...
 
 migrate:
-	docker cp migrations/0001_init.sql jobqueue-postgres:/0001_init.sql
-	docker exec -it jobqueue-postgres psql -U jobqueue -d jobqueue -f /0001_init.sql
+	docker cp migrations/0001_init.sql kairos-postgres:/0001_init.sql
+	docker exec -it kairos-postgres psql -U kairos -d kairos -f /0001_init.sql
 
 run-worker:
 	go run ./cmd/worker
@@ -53,13 +53,13 @@ sec:
 	gosec ./...
 
 docker-build-worker:
-	docker build --build-arg CMD_PATH=cmd/worker -t jobqueue-worker .
+	docker build --build-arg CMD_PATH=cmd/worker -t kairos-worker .
 
 docker-build-scheduler:
-	docker build --build-arg CMD_PATH=cmd/scheduler -t jobqueue-scheduler .
+	docker build --build-arg CMD_PATH=cmd/scheduler -t kairos-scheduler .
 
 docker-build-producer:
-	docker build --build-arg CMD_PATH=cmd/producer -t jobqueue-producer .
+	docker build --build-arg CMD_PATH=cmd/producer -t kairos-producer .
 
 docker-build-deadletter:
-	docker build --build-arg CMD_PATH=cmd/deadletter -t jobqueue-deadletter .
+	docker build --build-arg CMD_PATH=cmd/deadletter -t kairos-deadletter .

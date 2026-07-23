@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/harshalvk/jobqueue/internal/job"
-	"github.com/harshalvk/jobqueue/internal/queue"
-	"github.com/harshalvk/jobqueue/internal/store"
+	"github.com/harshalvk/kairos/internal/job"
+	"github.com/harshalvk/kairos/internal/queue"
+	"github.com/harshalvk/kairos/internal/store"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )

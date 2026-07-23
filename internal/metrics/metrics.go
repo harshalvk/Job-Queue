@@ -7,7 +7,7 @@ import "github.com/prometheus/client_golang/prometheus"
 var (
 	JobsProcessed = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "jobqueue_jobs_processed_total",
+			Name: "karios_jobs_processed_total",
 			Help: "Total number of jobs processed, labeled by type and outcome.",
 		},
 		[]string{"type", "outcome"},
@@ -16,7 +16,7 @@ var (
 	// JobDuration measures how long each job's handler takes to run.
 	JobDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name:    "jobqueue_job_duration_seconds",
+			Name:    "karios_job_duration_seconds",
 			Help:    "Duration of job handler exectuion in seconds.",
 			Buckets: prometheus.DefBuckets,
 		},
@@ -27,7 +27,7 @@ var (
 	// pending queue.
 	QueueDepth = prometheus.NewGauge(
 		prometheus.GaugeOpts{
-			Name: "jobqueue_pending_depth",
+			Name: "kairos_pending_depth",
 			Help: "Current number of jobs waiting in the pending queue.",
 		},
 	)

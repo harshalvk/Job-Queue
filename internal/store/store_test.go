@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/harshalvk/jobqueue/internal/job"
-	"github.com/harshalvk/jobqueue/internal/store"
+	"github.com/harshalvk/kairos/internal/job"
+	"github.com/harshalvk/kairos/internal/store"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,9 +18,9 @@ func setupPostgres(t *testing.T) *pgxpool.Pool {
 	ctx := context.Background()
 
 	container, err := tcpostgres.Run(ctx, "postgres:16-alpine",
-		tcpostgres.WithDatabase("jobqueue"),
-		tcpostgres.WithUsername("jobqueue"),
-		tcpostgres.WithPassword("jobqueue"),
+		tcpostgres.WithDatabase("kairos"),
+		tcpostgres.WithUsername("kairos"),
+		tcpostgres.WithPassword("kairos"),
 		tcpostgres.BasicWaitStrategies())
 	require.NoError(t, err)
 	t.Cleanup(func() {

@@ -1,17 +1,21 @@
-# Job Queue ![visitors](https://visitor-badge.laobi.icu/badge?page_id=harshalvk.job-queue&left_text=visitors&left_color=%234f4f4f&right_color=%23c48312)
-[![CI](https://github.com/harshalvk/jobqueue/actions/workflows/ci.yml/badge.svg)](https://github.com/harshalvk/Job-Queue/actions/workflows/ci.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/harshalvk/jobqueue)](https://goreportcard.com/report/github.com/harshalvk/jobqueue)
-[![Go Reference](https://pkg.go.dev/badge/github.com/harshalvk/jobqueue.svg)](https://pkg.go.dev/github.com/harshalvk/jobqueue)
+# Kairos
+
+![visitors](https://visitor-badge.laobi.icu/badge?page_id=harshalvk.job-queue&left_text=visitors&left_color=%234f4f4f&right_color=%23c48312)
+[![CI](https://github.com/harshalvk/kairos/actions/workflows/ci.yml/badge.svg)](https://github.com/harshalvk/Job-Queue/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/harshalvk/kairos)](https://goreportcard.com/report/github.com/harshalvk/kairos)
+[![Go Reference](https://pkg.go.dev/badge/github.com/harshalvk/kairos.svg)](https://pkg.go.dev/github.com/harshalvk/kairos)
 <img width="1498" height="288" alt="image" src="https://github.com/user-attachments/assets/1622967b-2453-490e-ae40-432183abacda" />
 
+A distributed job queue built from scratch in Go — a mini Sidekiq/Celery, without reaching for an off-the-shelf framework. The goal is to actually understand the primitives (worker pools, retries, dead-lettering, priority queues, dependency graphs, idempotency) rather than just importing a library that hides them.
 
-A distributed job queue built from scratch in Go — a mini Sidekiq/Celery, without reaching for an off-the-shelf framework. The goal is to actually understand the primitives (worker pools, retries, dead-lettering, backoff) rather than just importing a library that hides them.
+## Why "Kairos"
 
-Backed by Redis for the hot queue, with Postgres planned for durable job history.
+In ancient Greek, *chronos* is clock time — sequential, measured. *Kairos* is the right, opportune moment for something to happen. That's really what this queue is about: not running things fast, but running each job at the moment it's actually meant to run — after dependencies resolve, once backoff has passed, ahead of lower-priority work when it matters. Kairos felt like the right name for a system whose whole job is figuring out the right moment.
 
 ## Why build this instead of using an existing library?
 
-Libraries like Sidekiq, Celery, or Asynq solve this problem well — but using them skips past the actual mechanics: 
+Libraries like Sidekiq, Celery, or Asynq solve this problem well — but using them skips past the actual mechanics:
+
 - how does a worker pool avoid spawning unbounded goroutines?
 - How do retries avoid hammering a failing dependency?
 - How do you not lose jobs when a process crashes mid-retry?
@@ -21,9 +25,9 @@ This project builds each of those pieces manually, one at a time, with the reaso
 ## Project structure
 
 ```
-jobqueue/
+kairos/
 ├── go.mod
-├── job.go              # core Job struct and constructor (package jobqueue)
+├── job.go              # core Job struct and constructor (package kairos)
 ├── queue.go            # Redis-backed queue: enqueue/dequeue/dead-letter ops
 ├── worker.go           # worker pool, retry logic, backoff
 ├── cmd/
@@ -35,7 +39,7 @@ jobqueue/
 ```
 
 ## Supported features
- 
+
 - **Core job model** — UUID-based `Job` struct (`Type`, raw JSON `Payload`, `Status`, `Attempts`/`MaxAttempts`, timestamps, `LastError`) that every other component builds against.
 - **Redis-backed queue** — `Enqueue`/`Dequeue` via `LPUSH`/`BRPOP`. Blocking pop means no polling loop burning CPU.
 - **Worker pool** — fixed number of goroutines pulling and routing jobs to registered `Handler`s by `job.Type`, capping parallelism to protect downstream resources.
@@ -46,6 +50,7 @@ jobqueue/
 - **Metrics** — Prometheus counters/histogram/gauge on `/metrics`: jobs processed (by type + outcome), handler duration, pending queue depth.
 - **Graceful shutdown** — workers stop picking up new jobs on SIGTERM/SIGINT but let an in-flight job finish, bounded by a shutdown timeout.
 - **Multi-node ready** — `BRPOP` already distributes work safely across multiple worker processes with no extra code; workers are tagged with a `nodeID` for log attribution across machines. Leader election and queue sharding are known, intentionally unbuilt next steps.
+
 ## Running it locally
 
 ```bash
@@ -53,8 +58,8 @@ jobqueue/
 docker compose up -d
 
 # run schema against postgres (copy + exec avoids psql needing to be installed locally)
-docker cp schema.sql jobqueue-postgres:/schema.sql
-docker exec -it jobqueue-postgres psql -U jobqueue -d jobqueue -f /schema.sql
+docker cp schema.sql kairos-postgres:/schema.sql
+docker exec -it kairos-postgres psql -U kairos -d kairos -f /schema.sql
 
 # terminal 1: start the worker pool (serves metrics on :2112/metrics)
 go run ./cmd/worker
@@ -85,7 +90,7 @@ docker compose down -v
 - github.com/google/uuid
 - github.com/jackc/pgx/v5/pgxpool
 - github.com/prometheus/client_golang
-> README.md is ai-generated
+  > README.md is ai-generated
 
 ## Documentation
 

@@ -1,4 +1,4 @@
-module github.com/harshalvk/jobqueue
+module github.com/harshalvk/kairos
 
 go 1.25.0
 
