@@ -59,7 +59,7 @@ func TestRecordCreatedAndStatus(t *testing.T) {
 
 	payload, err := json.Marshal(map[string]string{"to": "test@example.com"})
 	require.NoError(t, err)
-	j := job.NewJob("send_email", payload, 3)
+	j := job.New("send_email", payload, 3)
 
 	require.NoError(t, s.RecordCreated(ctx, j))
 
@@ -79,7 +79,7 @@ func TestRecordCreated_IgnoresDuplicateID(t *testing.T) {
 
 	payload, err := json.Marshal(map[string]string{"to": "test@example.com"})
 	require.NoError(t, err)
-	j := job.NewJob("send_email", payload, 3)
+	j := job.New("send_email", payload, 3)
 
 	require.NoError(t, s.RecordCreated(ctx, j))
 	require.NoError(t, s.RecordCreated(ctx, j)) // should not error, ON CONFLICT DO NOTHING

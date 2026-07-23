@@ -17,7 +17,7 @@ func main() {
 	flag.Parse()
 
 	rdb := redis.NewClient(&redis.Options{Addr: "localhost:6379"})
-	q := queue.NewQueue(rdb)
+	q := queue.New(rdb)
 	ctx := context.Background()
 
 	switch *action {
