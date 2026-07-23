@@ -16,7 +16,7 @@ import (
 
 func main() {
 	rdb := redis.NewClient(&redis.Options{Addr: "localhost:6379"})
-	q := queue.NewQueue(rdb)
+	q := queue.New(rdb)
 	ctx := context.Background()
 
 	db, err := pgxpool.New(ctx, "postgres://postgres:postgres@localhost:5432/postgres")
@@ -30,7 +30,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to marshal payload: %v", err)
 	}
-	job := job.NewJob("send_email", payload, 3)
+	job := job.NewWithPriority("send_email", payload, 3, job.PriorityHigh)
 
 	if err := q.Enqueue(ctx, job); err != nil {
 		panic(err)

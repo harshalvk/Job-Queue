@@ -18,13 +18,30 @@ const (
 	delayedKey    = "jobqueue:delayed"
 )
 
+var pendingKeys = map[job.Priority]string{
+	job.PriorityHigh:    "jobqueue:pending:high",
+	job.PriorityDefault: "jobqueue:pending:default",
+	job.PriorityLow:     "jobqueue:pending:low",
+}
+
+// dequeueOrder defines the prioiryt check order - high checked firs,
+// then low last
+var dequeueOrder = []job.Priority{job.PriorityHigh, job.PriorityDefault, job.PriorityLow}
+
+func keyFor(p job.Priority) string {
+	if key, ok := pendingKeys[p]; ok {
+		return key
+	}
+	return pendingKeys[job.PriorityDefault] // unknown priority falls back to default
+}
+
 // Queue wraps a Redis client to provide job enqueue/dequeue operations.
 type Queue struct {
 	rdb *redis.Client
 }
 
-// NewQueue creates a Queue backed by the given Redis client.
-func NewQueue(rdb *redis.Client) *Queue {
+// New creates a Queue backed by the given Redis client.
+func New(rdb *redis.Client) *Queue {
 	return &Queue{rdb}
 }
 
@@ -36,13 +53,18 @@ func (q *Queue) Enqueue(ctx context.Context, j *job.Job) error {
 		return fmt.Errorf("marshal job: %w", err)
 	}
 
-	return q.rdb.LPush(ctx, queueKey, data).Err()
+	return q.rdb.LPush(ctx, keyFor(j.Priority), data).Err()
 }
 
 // Dequeue blocks until a job is available, then returns it.
 // A timeout of 0 means block forever.
 func (q *Queue) Dequeue(ctx context.Context, timeout time.Duration) (*job.Job, error) {
-	result, err := q.rdb.BRPop(ctx, timeout, queueKey).Result()
+	keys := make([]string, len(dequeueOrder))
+	for i, p := range dequeueOrder {
+		keys[i] = pendingKeys[p]
+	}
+
+	result, err := q.rdb.BRPop(ctx, timeout, keys...).Result()
 
 	if err != nil {
 		return nil, err
@@ -169,8 +191,11 @@ func (q *Queue) PromoteDueJobs(ctx context.Context) (int, error) {
 	}
 
 	for _, data := range due {
-		// move atomatially (in a i think semi-automatic-way): push to pending, then remove from delayed
-		if err := q.rdb.LPush(ctx, queueKey, data).Err(); err != nil {
+		var j job.Job
+		if err := json.Unmarshal([]byte(data), &j); err != nil {
+			return 0, fmt.Errorf("unmarshal due job: %w", err)
+		}
+		if err := q.rdb.LPush(ctx, keyFor(j.Priority), data).Err(); err != nil {
 			return 0, fmt.Errorf("push promoted job: %w", err)
 		}
 		if err := q.rdb.ZRem(ctx, delayedKey, data).Err(); err != nil {
@@ -182,6 +207,19 @@ func (q *Queue) PromoteDueJobs(ctx context.Context) (int, error) {
 }
 
 // Depth returns the current number of pending jobs.
-func (q *Queue) Depth(ctx context.Context) (int64, error) {
-	return q.rdb.LLen(ctx, queueKey).Result()
+func (q *Queue) Depth(ctx context.Context, p job.Priority) (int64, error) {
+	return q.rdb.LLen(ctx, keyFor(p)).Result()
+}
+
+// TotalDepth retuns the sum of pending jobs across all priority levels
+func (q *Queue) TotalDepth(ctx context.Context) (int64, error) {
+	var total int64
+	for _, key := range pendingKeys {
+		n, err := q.rdb.LLen(ctx, key).Result()
+		if err != nil {
+			return 0, err
+		}
+		total += n
+	}
+	return total, nil
 }

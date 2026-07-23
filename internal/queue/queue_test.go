@@ -38,12 +38,12 @@ func setupRedis(t *testing.T) *redis.Client {
 
 func TestEnqueueDequeue(t *testing.T) {
 	rdb := setupRedis(t)
-	q := queue.NewQueue(rdb)
+	q := queue.New(rdb)
 	ctx := context.Background()
 
 	payload, err := json.Marshal(map[string]string{"to": "test@example.com"})
 	require.NoError(t, err)
-	j := job.NewJob("send_email", payload, 3)
+	j := job.New("send_email", payload, 3)
 
 	require.NoError(t, q.Enqueue(ctx, j))
 
@@ -57,7 +57,7 @@ func TestEnqueueDequeue(t *testing.T) {
 
 func TestDequeue_TimesOutWhenEmpty(t *testing.T) {
 	rdb := setupRedis(t)
-	q := queue.NewQueue(rdb)
+	q := queue.New(rdb)
 	ctx := context.Background()
 
 	_, err := q.Dequeue(ctx, 1*time.Second)
@@ -66,12 +66,12 @@ func TestDequeue_TimesOutWhenEmpty(t *testing.T) {
 
 func TestDeadLetter_MoveListRequeue(t *testing.T) {
 	rdb := setupRedis(t)
-	q := queue.NewQueue(rdb)
+	q := queue.New(rdb)
 	ctx := context.Background()
 
 	payload, err := json.Marshal(map[string]string{"to": "test@example.com"})
 	require.NoError(t, err)
-	j := job.NewJob("send_email", payload, 3)
+	j := job.New("send_email", payload, 3)
 	j.Attempts = 3
 	j.LastError = "simulated failure"
 
@@ -97,14 +97,14 @@ func TestDeadLetter_MoveListRequeue(t *testing.T) {
 
 func TestDelayedJobs_PromoteDueJobs(t *testing.T) {
 	rdb := setupRedis(t)
-	q := queue.NewQueue(rdb)
+	q := queue.New(rdb)
 	ctx := context.Background()
 
 	payload, err := json.Marshal(map[string]string{"to": "test@example.com"})
 	require.NoError(t, err)
 
-	dueJob := job.NewJob("send_email", payload, 3)
-	futureJob := job.NewJob("send_email", payload, 3)
+	dueJob := job.New("send_email", payload, 3)
+	futureJob := job.New("send_email", payload, 3)
 
 	// one job due in the past, one due far in the future
 	require.NoError(t, q.EnqueueDelayed(ctx, dueJob, time.Now().Add(-1*time.Second)))
@@ -121,4 +121,24 @@ func TestDelayedJobs_PromoteDueJobs(t *testing.T) {
 	// future job should still not be in pending
 	_, err = q.Dequeue(ctx, 1*time.Second)
 	assert.ErrorIs(t, err, redis.Nil)
+}
+
+func TestDequeue_PrioritizesHighOverDefault(t *testing.T) {
+	rdb := setupRedis(t)
+	q := queue.New(rdb)
+	ctx := context.Background()
+
+	payload, err := json.Marshal(map[string]string{"to": "test@example.com"})
+	require.NoError(t, err)
+
+	lowJob := job.NewWithPriority("send_email", payload, 3, job.PriorityLow)
+	highJob := job.NewWithPriority("send_email", payload, 3, job.PriorityHigh)
+
+	// enqueue low first, then high — high should still come out first
+	require.NoError(t, q.Enqueue(ctx, lowJob))
+	require.NoError(t, q.Enqueue(ctx, highJob))
+
+	got, err := q.Dequeue(ctx, 2*time.Second)
+	require.NoError(t, err)
+	assert.Equal(t, highJob.ID, got.ID)
 }

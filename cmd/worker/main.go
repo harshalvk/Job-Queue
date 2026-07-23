@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -22,30 +23,30 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// func sendEmailHandler(ctx context.Context, job *jobqueue.Job) error {
-// 	var payload struct {
-// 		To string `json:"to"`
-// 	}
-// 	if err := json.Unmarshal(job.Payload, &payload); err != nil {
-// 		return err
-// 	}
-// 	fmt.Printf("sending email to %s (job %s)\n", payload.To, job.ID)
-// 	return nil
-// }
-
-// simulated version to fail a job
-func sendEmailHandler(_ context.Context, j *job.Job) error {
-	time.Sleep(5 * time.Second)
-	fmt.Printf("email send for job %s\n", j.ID)
+func sendEmailHandler(_ context.Context, job *job.Job) error {
+	var payload struct {
+		To string `json:"to"`
+	}
+	if err := json.Unmarshal(job.Payload, &payload); err != nil {
+		return err
+	}
+	fmt.Printf("sending email to %s (job %s)\n", payload.To, job.ID)
 	return nil
 }
+
+// // simulated version to fail a job
+// func sendEmailHandler(_ context.Context, j *job.Job) error {
+// 	time.Sleep(5 * time.Second)
+// 	fmt.Printf("email send for job %s\n", j.ID)
+// 	return nil
+// }
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
 	rdb := redis.NewClient(&redis.Options{Addr: "localhost:6379"})
-	queue := queue.NewQueue(rdb)
+	queue := queue.New(rdb)
 
 	db, err := pgxpool.New(ctx, "postgres://postgres:postgres@localhost:5432/postgres")
 	if err != nil {
@@ -82,7 +83,7 @@ func main() {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				depth, err := queue.Depth(ctx)
+				depth, err := queue.TotalDepth(ctx)
 				if err != nil {
 					continue
 				}
