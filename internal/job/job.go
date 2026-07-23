@@ -34,17 +34,18 @@ const (
 
 // Job represents a single unit of work to be processed by a worker.
 type Job struct {
-	ID          string          `json:"id"`
-	Type        string          `json:"type"`
-	Payload     json.RawMessage `json:"payload"`
-	Status      Status          `json:"status"`
-	Priority    Priority        `json:"priority"`
-	Attempts    int             `json:"attempts"`
-	MaxAttempts int             `json:"max_attempts"`
-	CreatedAt   time.Time       `json:"created_at"`
-	RunAt       time.Time       `json:"run_at"`
-	LastError   string          `json:"last_error,omitempty"`
-	DependsOn   []string        `json:"depends_on,omitempty"`
+	ID             string          `json:"id"`
+	Type           string          `json:"type"`
+	Payload        json.RawMessage `json:"payload"`
+	Status         Status          `json:"status"`
+	Priority       Priority        `json:"priority"`
+	Attempts       int             `json:"attempts"`
+	MaxAttempts    int             `json:"max_attempts"`
+	CreatedAt      time.Time       `json:"created_at"`
+	RunAt          time.Time       `json:"run_at"`
+	LastError      string          `json:"last_error,omitempty"`
+	DependsOn      []string        `json:"depends_on,omitempty"`
+	IdempotencyKey string          `json:"idempotency_key,omitempty"`
 }
 
 // New creates a new Job with a generated UUID and pending status.
@@ -74,5 +75,14 @@ func NewWithPriority(jobType string, payload json.RawMessage, maxAttempts int, p
 func NewWithDependencies(jobType string, payload json.RawMessage, maxAttempts int, dependsOn []string) *Job {
 	j := New(jobType, payload, maxAttempts)
 	j.DependsOn = dependsOn
+	return j
+}
+
+// NewWithIdempotencyKey creates a new job tagged with a caller-supplied
+// idempotency key; enqueuing two jobs with the same key (of the same type)
+// results in only the first one actually running
+func NewWithIdempotencyKey(jobType string, payload json.RawMessage, maxAttempts int, key string) *Job {
+	j := New(jobType, payload, maxAttempts)
+	j.IdempotencyKey = key
 	return j
 }

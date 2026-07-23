@@ -187,3 +187,51 @@ func TestDependencies_CascadeFailOnUpstreamDeadLetter(t *testing.T) {
 	assert.Equal(t, downstream.ID, dead[0].ID)
 	assert.Contains(t, dead[0].LastError, upstream.ID)
 }
+
+func TestEnqueueIdempotent_SkipsDuplicateKey(t *testing.T) {
+	rdb := setupRedis(t)
+	q := queue.New(rdb)
+	ctx := context.Background()
+
+	payload, err := json.Marshal(map[string]string{"to": "test@example.com"})
+	require.NoError(t, err)
+
+	first := job.NewWithIdempotencyKey("send_email", payload, 3, "user-42-welcome")
+	second := job.NewWithIdempotencyKey("send_email", payload, 3, "user-42-welcome")
+
+	enqueued1, err := q.EnqueueIdempotent(ctx, first, time.Hour)
+	require.NoError(t, err)
+	assert.True(t, enqueued1)
+
+	enqueued2, err := q.EnqueueIdempotent(ctx, second, time.Hour)
+	require.NoError(t, err)
+	assert.False(t, enqueued2) // duplicate, should be skipped
+
+	// only one job should actually be in the pending queue
+	got, err := q.Dequeue(ctx, 1*time.Second)
+	require.NoError(t, err)
+	assert.Equal(t, first.ID, got.ID)
+
+	_, err = q.Dequeue(ctx, 1*time.Second)
+	assert.ErrorIs(t, err, redis.Nil) // second one never made it in
+}
+
+func TestEnqueueIdempotent_DifferentTypesSameKeyBothEnqueue(t *testing.T) {
+	rdb := setupRedis(t)
+	q := queue.New(rdb)
+	ctx := context.Background()
+
+	payload, err := json.Marshal(map[string]string{"to": "test@example.com"})
+	require.NoError(t, err)
+
+	emailJob := job.NewWithIdempotencyKey("send_email", payload, 3, "user-42")
+	resizeJob := job.NewWithIdempotencyKey("resize_image", payload, 3, "user-42")
+
+	enqueued1, err := q.EnqueueIdempotent(ctx, emailJob, time.Hour)
+	require.NoError(t, err)
+	assert.True(t, enqueued1)
+
+	enqueued2, err := q.EnqueueIdempotent(ctx, resizeJob, time.Hour)
+	require.NoError(t, err)
+	assert.True(t, enqueued2) // different type, same key — not a duplicate
+}

@@ -25,6 +25,8 @@ const (
 	dependentsKeyPrefix   = "jobqueue:dependents:"
 )
 
+const idempotencyKeyPrefix = "jobqueue:idempotency:"
+
 var pendingKeys = map[job.Priority]string{
 	job.PriorityHigh:    "jobqueue:pending:high",
 	job.PriorityDefault: "jobqueue:pending:default",
@@ -357,4 +359,47 @@ func (q *Queue) CascadeFailDependents(ctx context.Context, failedJobID string) e
 	}
 
 	return nil
+}
+
+func idempotencyRedisKey(jobType, key string) string {
+	// Scoped by job type so the same key can be reused across different
+	// job types without colliding — "user-123" as an idempotency key for
+	// send_email shouldn't block "user-123" for resize_image.
+	return idempotencyKeyPrefix + jobType + ":" + key
+}
+
+// EnqueueIdempotent enqueues j only if no job with the same Type and
+// IdemotencyKey has been enqueued within ttl. returns (true, nil) if the
+// job was actually enqueued, (false, nil) if it was a duplicate and
+// silently skipped. if j.IdempotencyKey is empty, it always enqueus
+// (idempotency is opt-in per job)
+func (q *Queue) EnqueueIdempotent(ctx context.Context, j *job.Job, ttl time.Duration) (bool, error) {
+	if j.IdempotencyKey == "" {
+		return true, q.Enqueue(ctx, j)
+	}
+
+	redisKey := idempotencyRedisKey(j.Type, j.IdempotencyKey)
+
+	// SET NX: only succeed if the key doesn't already exist. this is the
+	// atomic "claim" opertion - two concurrent producers reacing to
+	// enqueue the same idempotency key will have exactly one SETNX
+	// succeed, so there's no window for both to slip through
+	acquired, err := q.rdb.SetNX(ctx, redisKey, j.ID, ttl).Result()
+	if err != nil {
+		return false, fmt.Errorf("idempotency check: %w", err)
+	}
+	if !acquired {
+		return false, nil // duplicate - already claimed by an earler enqueue
+	}
+
+	if err := q.Enqueue(ctx, j); err != nil {
+		// Enqueue failed after we clamied the key - release the claim so a
+		// legitimate retry isn't permanently blocked by our own failure
+		if delErr := q.rdb.Del(ctx, redisKey).Err(); delErr != nil {
+			return false, fmt.Errorf("enqueue failed (%v), and failed to release idempotency claim: %w", err, delErr)
+		}
+		return false, fmt.Errorf("enqueue after idempotency claim: %w", err)
+	}
+
+	return true, nil
 }
