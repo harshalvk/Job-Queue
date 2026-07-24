@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"log"
+	"os"
 	"time"
 
 	"github.com/harshalvk/kairos/internal/queue"
@@ -12,7 +13,11 @@ import (
 )
 
 func main() {
-	rdb := redis.NewClient(&redis.Options{Addr: "localhost:6379"})
+		redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" {
+		redisAddr = "localhost:6379"
+	}
+	rdb := redis.NewClient(&redis.Options{Addr: redisAddr})
 	q := queue.New(rdb)
 	ctx := context.Background()
 

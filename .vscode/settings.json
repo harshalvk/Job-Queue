@@ -1,4 +1,7 @@
 {
   "go.formatTool": "goimports",
-  "editor.formatOnSave": true
+  "editor.formatOnSave": true,
+  "yaml.schemas": {
+    "none": ["observability/grafana/provisioning/**/*.yml"]
+  }
 }

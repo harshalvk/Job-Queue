@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"log"
+	"os"
 	"os/signal"
 	"syscall"
 
@@ -21,10 +22,18 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	rdb := redis.NewClient(&redis.Options{Addr: "localhost:6379"})
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" {
+		redisAddr = "localhost:6379"
+	}
+	rdb := redis.NewClient(&redis.Options{Addr: redisAddr})
 	q := queue.New(rdb)
 
-	db, err := pgxpool.New(ctx, "postgres://kairos:kairos@localhost:5432/kairos")
+	pgDSN := os.Getenv("POSTGRES_DSN")
+	if pgDSN == "" {
+		pgDSN = "postgres://kairos:kairos@localhost:5432/kairos"
+	}
+	db, err := pgxpool.New(ctx, pgDSN)
 	if err != nil {
 		panic(err)
 	}

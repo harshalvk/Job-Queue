@@ -19,6 +19,50 @@ services:
     volumes:
       - redis-data:/data
 
+  worker:
+    build:
+      context: .
+      args:
+        CMD_PATH: cmd/worker
+    container_name: kairos-worker
+    environment:
+      NODE_ID: docker-worker-1
+      REDIS_ADDR: redis:6379
+      POSTGRES_DSN: postgres://kairos:kairos@db:5432/kairos
+    ports:
+      - "2112:2112"
+    depends_on:
+      - redis
+      - db
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: kairos-prometheus
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      - worker
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: kairos-grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: kairos
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+
 volumes:
   postgres-data:
   redis-data:
+  prometheus-data:
+  grafana-data:

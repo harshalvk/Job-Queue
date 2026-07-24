@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/harshalvk/kairos/internal/job"
 	"github.com/harshalvk/kairos/internal/queue"
@@ -15,11 +16,19 @@ import (
 )
 
 func main() {
-	rdb := redis.NewClient(&redis.Options{Addr: "localhost:6379"})
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" {
+		redisAddr = "localhost:6379"
+	}
+	rdb := redis.NewClient(&redis.Options{Addr: redisAddr})
 	q := queue.New(rdb)
 	ctx := context.Background()
 
-	db, err := pgxpool.New(ctx, "postgres://kairos:kairos@localhost:5432/kairos")
+	pgDSN := os.Getenv("POSTGRES_DSN")
+	if pgDSN == "" {
+		pgDSN = "postgres://kairos:kairos@localhost:5432/kairos"
+	}
+	db, err := pgxpool.New(ctx, pgDSN)
 	if err != nil {
 		panic(err)
 	}

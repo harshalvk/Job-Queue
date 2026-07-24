@@ -69,3 +69,10 @@ docker-build-producer:
 
 docker-build-deadletter:
 	docker build --build-arg CMD_PATH=cmd/deadletter -t kairos-deadletter .
+
+docker-up: ## Start redis, postgres, worker, prometheus, and grafana
+	docker compose up -d --build
+
+grafana: ## Open Grafana in the browser (admin/kairos, or anonymous viewer access)
+	@echo "Grafana: http://localhost:3000"
+	@echo "Prometheus: http://localhost:9090"

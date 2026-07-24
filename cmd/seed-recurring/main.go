@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"os"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -13,7 +14,11 @@ import (
 
 func main() {
 	ctx := context.Background()
-	db, err := pgxpool.New(ctx, "postgres://kairos:kairos@localhost:5432/kairos")
+pgDSN := os.Getenv("POSTGRES_DSN")
+	if pgDSN == "" {
+		pgDSN = "postgres://kairos:kairos@localhost:5432/kairos"
+	}
+	db, err := pgxpool.New(ctx, pgDSN)
 	if err != nil {
 		panic(err)
 	}

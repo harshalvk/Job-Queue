@@ -1,0 +1,60 @@
+{
+  "title": "Kairos Overview",
+  "timezone": "browser",
+  "panels": [
+    {
+      "title": "Jobs Processed (by outcome)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(kairos_jobs_processed_total[5m])) by (outcome)",
+          "legendFormat": "{{outcome}}"
+        }
+      ]
+    },
+    {
+      "title": "Pending Queue Depth",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "kairos_pending_depth",
+          "legendFormat": "pending"
+        }
+      ]
+    },
+    {
+      "title": "Job Duration (p50/p95/p99)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(kairos_job_duration_seconds_bucket[5m])) by (le, type))",
+          "legendFormat": "p50 {{type}}"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(kairos_job_duration_seconds_bucket[5m])) by (le, type))",
+          "legendFormat": "p95 {{type}}"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(kairos_job_duration_seconds_bucket[5m])) by (le, type))",
+          "legendFormat": "p99 {{type}}"
+        }
+      ]
+    },
+    {
+      "title": "Circuit Breaker State (by type)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "kairos_circuit_breaker_state",
+          "legendFormat": "{{type}}"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}

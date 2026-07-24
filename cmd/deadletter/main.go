@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/harshalvk/kairos/internal/queue"
 	"github.com/redis/go-redis/v9"
@@ -16,7 +17,11 @@ func main() {
 	jobID := flag.String("id", "", "job ID (required for requeue)")
 	flag.Parse()
 
-	rdb := redis.NewClient(&redis.Options{Addr: "localhost:6379"})
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" {
+		redisAddr = "localhost:6379"
+	}
+	rdb := redis.NewClient(&redis.Options{Addr: redisAddr})
 	q := queue.New(rdb)
 	ctx := context.Background()
 

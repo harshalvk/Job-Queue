@@ -48,13 +48,21 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	rdb := redis.NewClient(&redis.Options{Addr: "localhost:6379"})
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" {
+		redisAddr = "localhost:6379"
+	}
+	rdb := redis.NewClient(&redis.Options{Addr: redisAddr})
 	queue := queue.New(rdb)
 
 	limiter := ratelimit.New()
 	limiter.SetLimit("send_email", 5, 10) // 5/sec sustained, burst of 10
 
-	db, err := pgxpool.New(ctx, "postgres://kairos:kairos@localhost:5432/kairos")
+	pgDSN := os.Getenv("POSTGRES_DSN")
+	if pgDSN == "" {
+		pgDSN = "postgres://kairos:kairos@localhost:5432/kairos"
+	}
+	db, err := pgxpool.New(ctx, pgDSN)
 	if err != nil {
 		panic(err)
 	}
