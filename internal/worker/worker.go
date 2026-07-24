@@ -67,6 +67,11 @@ func (wp *Pool) Start(ctx context.Context, shutdownTimeout time.Duration) {
 		close(done)
 	}()
 
+	// wait for the shutdown signal first - workers run indefinitely
+	// until thne
+	<-ctx.Done()
+	log.Printf("shutdown signal received, waiting for in-flight jobs to finish...")
+
 	select {
 	case <-done:
 		log.Println("all workers exited cleanly")

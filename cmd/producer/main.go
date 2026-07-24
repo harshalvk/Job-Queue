@@ -19,7 +19,7 @@ func main() {
 	q := queue.New(rdb)
 	ctx := context.Background()
 
-	db, err := pgxpool.New(ctx, "postgres://postgres:postgres@localhost:5432/postgres")
+	db, err := pgxpool.New(ctx, "postgres://kairos:kairos@localhost:5432/kairos")
 	if err != nil {
 		panic(err)
 	}

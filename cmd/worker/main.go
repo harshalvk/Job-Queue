@@ -52,7 +52,7 @@ func main() {
 	limiter := ratelimit.New()
 	limiter.SetLimit("send_email", 5, 10) // 5/sec sustained, burst of 10
 
-	db, err := pgxpool.New(ctx, "postgres://postgres:postgres@localhost:5432/postgres")
+	db, err := pgxpool.New(ctx, "postgres://kairos:kairos@localhost:5432/kairos")
 	if err != nil {
 		panic(err)
 	}

@@ -5,7 +5,9 @@ services:
     ports:
       - 5432:5432
     environment:
-      - POSTGRES_HOST_AUTH_METHOD=trust
+      - POSTGRES_USER=kairos
+      - POSTGRES_PASSWORD=kairos
+      - POSTGRES_DB=kairos
     volumes:
       - postgres-data:/var/lib/postgresql/data
 
