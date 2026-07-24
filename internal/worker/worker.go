@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/harshalvk/kairos/internal/circuitbreaker"
 	"github.com/harshalvk/kairos/internal/job"
 	"github.com/harshalvk/kairos/internal/metrics"
 	"github.com/harshalvk/kairos/internal/queue"
@@ -27,12 +28,13 @@ type Pool struct {
 	concurrency int
 	nodeID      string
 	limiter     *ratelimit.Limiter
+	breaker     *circuitbreaker.Breaker
 }
 
 // NewPool creates a worker pool with the given concurrency, node
 // identifier, and rate limiter (pass ratelimit.New() with no configured limits
 // if rate limiting is not needed
-func NewPool(queue *queue.Queue, store *store.Store, concurrency int, nodeID string, limiter *ratelimit.Limiter) *Pool {
+func NewPool(queue *queue.Queue, store *store.Store, concurrency int, nodeID string, limiter *ratelimit.Limiter, breaker *circuitbreaker.Breaker) *Pool {
 	return &Pool{
 		queue:       queue,
 		store:       store,
@@ -40,6 +42,7 @@ func NewPool(queue *queue.Queue, store *store.Store, concurrency int, nodeID str
 		concurrency: concurrency,
 		nodeID:      nodeID,
 		limiter:     limiter,
+		breaker:     breaker,
 	}
 }
 
@@ -106,6 +109,15 @@ func (wp *Pool) process(ctx context.Context, workerID int, j *job.Job) {
 		return
 	}
 
+	if !wp.breaker.Allow(j.Type) {
+		// circuit is open - this dependency is known to be failing
+		// schedule a retry (same backoff mechanism as a normal failure)
+		// rather than attempting a call we already expect to fail
+		log.Printf("[%s] worker %d: circuit open for job type %q, deferring job %s", wp.nodeID, workerID, j.Type, j.ID)
+		wp.scheduleRetry(ctx, j)
+		return
+	}
+
 	if err := wp.limiter.Wait(ctx, j.Type); err != nil {
 		// ctx was cancled while watiting for a rate limit token - likely
 		// shutdown in progress. re-queue the job rather than dropping it
@@ -123,6 +135,8 @@ func (wp *Pool) process(ctx context.Context, workerID int, j *job.Job) {
 	metrics.JobDuration.WithLabelValues(j.Type).Observe(time.Since(start).Seconds())
 
 	if handleErr == nil {
+		wp.breaker.RecordSuccess(j.Type)
+		metrics.CircuitState.WithLabelValues(j.Type).Set(float64(wp.breaker.StateOf(j.Type)))
 		j.Status = job.StatusCompleted
 		metrics.JobsProcessed.WithLabelValues(j.Type, "completed").Inc()
 		if err := wp.store.RecordStatus(ctx, j); err != nil {
@@ -136,6 +150,8 @@ func (wp *Pool) process(ctx context.Context, workerID int, j *job.Job) {
 		return
 	}
 
+	wp.breaker.RecordFailure(j.Type)
+	metrics.CircuitState.WithLabelValues(j.Type).Set(float64(wp.breaker.StateOf(j.Type)))
 	j.Attempts++
 	j.LastError = handleErr.Error()
 	j.Status = job.StatusFailed

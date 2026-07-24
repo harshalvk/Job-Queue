@@ -31,8 +31,18 @@ var (
 			Help: "Current number of jobs waiting in the pending queue.",
 		},
 	)
+
+	// CircuitState reports the current circuit breaker state per job
+	// type: 0 = closed, 1 = open, 2 = half-open.
+	CircuitState = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "kairos_circuit_breaker_state",
+			Help: "Current circuit breaker state per job type (0=closed, 1=open, 2=half-open).",
+		},
+		[]string{"type"},
+	)
 )
 
 func init() {
-	prometheus.MustRegister(JobsProcessed, JobDuration, QueueDepth)
+	prometheus.MustRegister(JobsProcessed, JobDuration, QueueDepth, CircuitState)
 }

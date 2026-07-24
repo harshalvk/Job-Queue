@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/harshalvk/kairos/internal/circuitbreaker"
 	"github.com/harshalvk/kairos/internal/job"
 	"github.com/harshalvk/kairos/internal/metrics"
 	"github.com/harshalvk/kairos/internal/queue"
@@ -69,7 +70,8 @@ func main() {
 		nodeID = hostname
 	}
 
-	pool := worker.NewPool(queue, store, 5, nodeID, limiter) // 5 concurrent workers
+	breaker := circuitbreaker.New(5, 30*time.Second)                  // open after 5 consecutive fails, 30s cooldown
+	pool := worker.NewPool(queue, store, 5, nodeID, limiter, breaker) // 5 concurrent workers
 	pool.RegisterHandler("send_email", sendEmailHandler)
 
 	go func() {
